@@ -10,6 +10,7 @@
 #
 # The "name" property below is a short-form name to appear in the link-hints mode's name.  It's for debug only.
 #
+
 isMac = KeyboardUtils.platform == "Mac"
 OPEN_IN_CURRENT_TAB =
   name: "curr-tab"
@@ -430,33 +431,44 @@ class LinkHintsMode
     DomUtils.removeElement @hintMarkerContainingDiv if @hintMarkerContainingDiv
     @hintMarkerContainingDiv = null
 
+
 # Use characters for hints, and do not filter links by their text.
 class AlphabetHints
   constructor: ->
-    @linkHintCharacters = Settings.get("linkHintCharacters").toLowerCase()
+    @linkHintCharacters = Settings.get("linkHintCharacters").split(",")
     @hintKeystrokeQueue = []
 
   fillInMarkers: (hintMarkers) ->
     hintStrings = @hintStrings(hintMarkers.length)
     for marker, idx in hintMarkers
       marker.hintString = hintStrings[idx]
-      marker.innerHTML = spanWrap(marker.hintString.toUpperCase()) if marker.isLocalMarker
-
+      marker.innerHTML = spanWrap(marker.hintString) if marker.isLocalMarker
   #
   # Returns a list of hint strings which will uniquely identify the given number of links. The hint strings
   # may be of different lengths.
   #
   hintStrings: (linkCount) ->
-    hints = [""]
-    offset = 0
-    while hints.length - offset < linkCount or hints.length == 1
-      hint = hints[offset++]
-      hints.push ch + hint for ch in @linkHintCharacters
-    hints = hints[offset...offset+linkCount]
+    hints = @linkHintCharacters[...linkCount]
+	
+    # XMLHttp = new XMLHttpRequest()
+    # XMLHttp.open 'GET', 'http://localhost:35000/lang.txt', false
+    # XMLHttp.send null
+    # userLang = XMLHttp.responseText
+
+
+    # console.log userLang
+
+    #console.log get('http://localhost:35000/lang.txt').then((response) ->
+    #  response
+    #  )
+    # response = await fetch('http://localhost:35000/lang.txt')
+
+    # console.log response
+
 
     # Shuffle the hints so that they're scattered; hints starting with the same character and short hints are
     # spread evenly throughout the array.
-    return hints.sort().map (str) -> str.reverse()
+    return hints.shuffle()
 
   getMatchingHints: (hintMarkers) ->
     matchString = @hintKeystrokeQueue.join ""
@@ -896,6 +908,32 @@ class WaitForEnter extends Mode
         else if KeyboardUtils.isEscape event
           @exit()
           callback false # false -> isSuccess.
+
+# Rand taken from https://coffeescript-cookbook.github.io/chapters/math/generating-predictable-random-numbers
+class Rand
+  # if created without a seed, uses current time as seed
+  constructor: (@seed) ->
+    # Knuth and Lewis' improvements to Park and Miller's LCPRNG
+    @multiplier = 1664525
+    @modulo = 4294967296 # 2**32-1;
+    @offset = 1013904223
+
+  # return a random integer 0 <= n < @modulo
+  randn: ->
+    # new_seed = (a * seed + c) % m
+    @seed = (@multiplier*@seed + @offset) % @modulo
+
+ # return a random float 0 <= f < 1.0
+  randf: ->
+    this.randn() / @modulo
+
+# shuffle based on a pseudo-random number with a fixed seed to get a deterministic result
+Array::shuffle ?= ->
+  rand = new Rand(42)
+  if @length > 1 then for i in [@length-1..1]
+    j = Math.floor rand.randf() * (i + 1)
+    [@[i], @[j]] = [@[j], @[i]]
+  this
 
 root = exports ? (window.root ?= {})
 root.LinkHints = LinkHints
